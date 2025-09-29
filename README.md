@@ -1,3 +1,52 @@
+# Shape of Dreams — Save Editor
+
+A fast, dark-themed save editor for **Shape of Dreams** that lets you tweak stardust, hero mastery, unlock skills/gems, toggle banners & hats (with exclusives respected), complete achievements, and—if you know what you’re doing—edit raw JSON safely.  
+
+No source code is distributed in this repository; **binaries are published as Release assets only**.
+
+> **Not affiliated with Lizard Smoothie or the Shape of Dreams team.** Use at your own risk and in accordance with the game’s EULA.
+
+---
+
+## Security & VirusTotal
+
+Every release includes:
+- **SHA256 checksum** (`SHA256SUMS.txt`)
+- **VirusTotal scan link** (`VirusTotal.txt`)
+
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-View%20scan-blue)](https://github.com/Xion28080/SoDSaveEditor-Release/releases/latest)
+
+> If SmartScreen warns about an unknown app, click **More info → Run anyway**.  
+> Verify the SHA256 with:
+> ```powershell
+> Get-FileHash -Algorithm SHA256 .\SoDSaveEditor.exe
+> ```
+
+---
+
+## Download
+
+1. Go to this repository’s **Releases** page.
+2. Download the latest `SoDSaveEditor-vX.Y.Z.zip`.
+3. (Optional) Verify integrity using the matching `SHA256SUMS.txt`.
+
+> The auto-generated “Source code (zip/tar.gz)” links on the Releases page do **not** contain the app. Use the ZIP asset described above.
+
+---
+
+## Requirements
+
+- Windows 10/11 (x64)
+- No .NET install needed (the app is shipped as a self-contained build)
+
+---
+
+## Where are my save files?
+
+Typical location:
+
+%USERPROFILE%\AppData\LocalLow\Lizard Smoothie\Shape of Dreams\QuickSave
+
 
 Look for these two files inside that folder:
 
