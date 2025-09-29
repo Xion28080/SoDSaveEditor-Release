@@ -76,3 +76,10 @@ jobs:
           files: SoDSaveEditor-${{ inputs.tag }}.zip
           draft: false
           prerelease: ${{ inputs.prerelease }}
+
+        - name: Update release with README contents
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: |
+            gh release edit "${{ steps.tag.outputs.TAG }}" \
+              --notes-file README.md
