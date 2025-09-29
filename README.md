@@ -25,7 +25,7 @@ Every release includes:
 ## Download
 
 1. Go to this repository’s **Releases** page.
-2. Download the latest `SoDSaveEditor_vX.Y.Z_win-x64.zip`.
+2. Download the latest ` SoDSaveEditor-vX.Y.Z.zip `.
 3. (Optional) Verify integrity using the matching `SHA256_*.txt`.
 
 > The auto-generated “Source code (zip/tar.gz)” links on the Releases page do **not** contain the app. Use the ZIP asset described above.
