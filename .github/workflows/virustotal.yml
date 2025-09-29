@@ -2,14 +2,15 @@ name: VirusTotal scan
 
 on:
   workflow_run:
-    workflows: ["Build & Release (from private source)"]  
+    workflows: ["Build & Release (from private source)"]  # <-- exact name of your build workflow
     types: [completed]
-  workflow_dispatch: {}  
+  workflow_dispatch: {}  # allow manual runs
 
 jobs:
   vt:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
 
@@ -29,9 +30,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p out
-          # pick first .zip or .exe asset; tweak if you have multiple or different names
+          # Prefer .zip then .exe; adjust if you publish multiple artifacts
           ASSET=$(gh release view "${{ steps.tag.outputs.TAG }}" --json assets -q '.assets[].name' | grep -Ei '\.(zip|exe)$' | head -n1)
-          if [ -z "$ASSET" ]; then echo "No .zip/.exe asset found." >&2; exit 1; fi
+          if [ -z "$ASSET" ]; then echo "No .zip/.exe asset found" >&2; exit 1; fi
           echo "Asset: $ASSET"
           gh release download "${{ steps.tag.outputs.TAG }}" --pattern "$ASSET" --dir out
           if echo "$ASSET" | grep -qi '\.zip$'; then unzip -j out/"$ASSET" -d out; fi
@@ -42,7 +43,7 @@ jobs:
         run: |
           FILE=$(ls out/*.exe 2>/dev/null | head -n1 || true)
           if [ -z "$FILE" ]; then FILE=$(ls out/* 2>/dev/null | grep -vi '\.txt$' | head -n1 || true); fi
-          if [ -z "$FILE" ]; then echo "No file to scan." >&2; exit 1; fi
+          if [ -z "$FILE" ]; then echo "No file to scan" >&2; exit 1; fi
           SIZE=$(stat -c%s "$FILE")
           echo "FILE=$FILE" >> $GITHUB_OUTPUT
           echo "SIZE=$SIZE" >> $GITHUB_OUTPUT
@@ -54,50 +55,77 @@ jobs:
           echo "SHA=$(sha256sum '${{ steps.pick.outputs.FILE }}' | cut -d ' ' -f1)" >> $GITHUB_OUTPUT
           echo "SHA256: ${{ steps.hash.outputs.SHA }}"
 
-      - name: Submit to VirusTotal (handles >32MB automatically)
-        id: vt
+      - name: Query VirusTotal by hash (skip upload if known)
+        id: query
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          set -e
+          SHA="${{ steps.hash.outputs.SHA }}"
+          CODE=$(curl -s -o resp.json -w "%{http_code}" \
+            --request GET \
+            --url "https://www.virustotal.com/api/v3/files/$SHA" \
+            --header "x-apikey: $VT_API_KEY")
+          echo "HTTP=$CODE"
+          if [ "$CODE" = "200" ]; then
+            echo "KNOWN=true" >> $GITHUB_OUTPUT
+            echo "Known file on VT; triggering reanalysis..."
+            ANALYSIS=$(curl -s \
+              --request POST \
+              --url "https://www.virustotal.com/api/v3/files/$SHA/analyse" \
+              --header "x-apikey: $VT_API_KEY" | jq -r '.data.id')
+            echo "ANALYSIS=$ANALYSIS" >> $GITHUB_OUTPUT
+          else
+            echo "KNOWN=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload to VirusTotal (handles >32MB automatically)
+        id: vt_upload
+        if: steps.query.outputs.KNOWN == 'false'
         env:
           VT_API_KEY: ${{ secrets.VT_API_KEY }}
         run: |
           FILE="${{ steps.pick.outputs.FILE }}"
           SIZE="${{ steps.pick.outputs.SIZE }}"
-
           if [ "$SIZE" -gt 33554432 ]; then
-            echo "Using large-file upload_url..."
+            echo "Requesting large-file upload URL..."
             UP=$(curl -s --request GET \
               --url https://www.virustotal.com/api/v3/files/upload_url \
               --header "x-apikey: $VT_API_KEY" | jq -r '.data')
+            echo "Uploading large file..."
             RESP=$(curl -s --request POST --url "$UP" --form "file=@$FILE")
           else
-            echo "Using standard upload..."
+            echo "Uploading with standard endpoint..."
             RESP=$(curl -s --request POST \
               --url https://www.virustotal.com/api/v3/files \
               --header "x-apikey: $VT_API_KEY" \
               --form "file=@$FILE")
           fi
-
-          echo "Upload response: $RESP"
-          ANALYSIS=$(echo "$RESP" | jq -r '.data.id')
+          echo "$RESP" > upload.json
+          ANALYSIS=$(jq -r '.data.id' upload.json)
           if [ -z "$ANALYSIS" ] || [ "$ANALYSIS" = "null" ]; then
-            echo "Upload failed"; exit 1
+            echo "Upload failed"; cat upload.json; exit 1
           fi
           echo "ANALYSIS=$ANALYSIS" >> $GITHUB_OUTPUT
+          echo "Submitted analysis: $ANALYSIS"
 
-      - name: Wait for analysis to complete
+      - name: Wait for analysis to complete (long poll for big binaries)
         env:
           VT_API_KEY: ${{ secrets.VT_API_KEY }}
         run: |
-          ANALYSIS="${{ steps.vt.outputs.ANALYSIS }}"
-          for i in {1..30}; do
+          ANALYSIS="${{ steps.query.outputs.KNOWN == 'true' && steps.query.outputs.ANALYSIS || steps.vt_upload.outputs.ANALYSIS }}"
+          echo "Polling analysis: $ANALYSIS"
+          # up to ~20 minutes
+          for i in {1..120}; do
             STATUS=$(curl -s --request GET \
               --url "https://www.virustotal.com/api/v3/analyses/$ANALYSIS" \
               --header "x-apikey: $VT_API_KEY" | jq -r '.data.attributes.status')
-            echo "Status: $STATUS"
+            echo "[$i] Status: $STATUS"
             [ "$STATUS" = "completed" ] && break
             sleep 10
           done
 
-      - name: Upload VT link + SHA back to the release
+      - name: Upload VT link + SHA to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
