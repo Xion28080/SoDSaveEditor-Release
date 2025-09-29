@@ -6,6 +6,22 @@ A fast, dark-themed save editor for **Shape of Dreams** that lets you tweak star
 
 ---
 
+## Security & VirusTotal
+
+Every release includes:
+- **SHA256 checksum** (`SHA256SUMS.txt`)
+- **VirusTotal scan link** (`VirusTotal.txt`)
+
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-View%20scan-blue)](https://github.com/Xion28080/SoDSaveEditor-Release/releases/latest)
+
+> If SmartScreen warns about an unknown app, click **More info → Run anyway**.  
+> Verify the SHA256 with:
+> ```powershell
+> Get-FileHash -Algorithm SHA256 .\SoDSaveEditor.exe
+> ```
+
+---
+
 ## Download
 
 1. Go to this repository’s **Releases** page.
