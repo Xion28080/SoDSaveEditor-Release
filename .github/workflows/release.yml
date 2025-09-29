@@ -1,0 +1,87 @@
+name: Build & Release (from private source)
+
+on:
+  # Manual run (choose which ref/branch/commit from the private repo to build)
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Private repo ref (branch, tag, or commit SHA)'
+        required: false
+        default: 'main'
+  # Auto-release when you push a tag to this PUBLIC repo (e.g., v1.0.0)
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # needed to create a Release in this PUBLIC repo
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout PRIVATE repo (source)
+        uses: actions/checkout@v4
+        with:
+          repository: Xion28080/SoDSaveEditor
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ref: ${{ github.event.inputs.ref || 'main' }}
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # If your solution is at repo root, adjust as needed:
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish (win-x64, self-contained, single-file)
+        run: >
+          dotnet publish
+          -c Release
+          -r win-x64
+          --self-contained true
+          /p:PublishSingleFile=true
+          /p:IncludeNativeLibrariesForSelfExtract=true
+          /p:DebugType=None
+          /p:DebugSymbols=false
+
+      # Find the publish output (adjust project name if not SoDSaveEditor)
+      - name: Locate output
+        id: out
+        shell: pwsh
+        run: |
+          $p = Get-ChildItem -Recurse -Directory -Filter "publish" |
+               Where-Object { $_.FullName -match "bin\\Release\\net8.0-windows\\win-x64\\publish$" } |
+               Select-Object -First 1 -ExpandProperty FullName
+          if (-not $p) { throw "Publish folder not found." }
+          echo "path=$p" >> $env:GITHUB_OUTPUT
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          $zip = "SoDSaveEditor-win-x64.zip"
+          Compress-Archive -Path "${{ steps.out.outputs.path }}\*" -DestinationPath $zip -Force
+          echo "Created $zip"
+          Get-ChildItem $zip
+
+      # Upload artifact for job logs (optional)
+      - name: Upload artifact (CI)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SoDSaveEditor-win-x64
+          path: SoDSaveEditor-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      # Create or update a GitHub Release in this PUBLIC repo
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SoDSaveEditor-win-x64.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
