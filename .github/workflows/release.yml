@@ -17,7 +17,7 @@ permissions:
 env:
   # 🔧 CHANGE THESE TWO to match your setup
   PRIVATE_REPO: Xion28080/SoDSaveEditor        # e.g. Xion28080/SoDSaveEditor-Private
-  PROJECT_PATH: src/SoDSaveEditor/SoDSaveEditor.csproj
+  PROJECT_PATH: src/SoDSaveEditor.csproj
 
 jobs:
   build-release:
