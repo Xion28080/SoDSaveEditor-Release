@@ -2,9 +2,9 @@ name: VirusTotal scan
 
 on:
   workflow_run:
-    workflows: ["Build & Release (from private source)"]  # <-- exact name of your build workflow
+    workflows: ["Build & Release (from private source)"]  
     types: [completed]
-  workflow_dispatch: {}  # manual run option
+  workflow_dispatch: {}  
 
 jobs:
   vt:
