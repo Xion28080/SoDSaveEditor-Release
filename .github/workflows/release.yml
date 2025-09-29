@@ -1,87 +1,60 @@
 name: Build & Release (from private source)
 
 on:
-  # Manual run (choose which ref/branch/commit from the private repo to build)
   workflow_dispatch:
     inputs:
-      ref:
-        description: 'Private repo ref (branch, tag, or commit SHA)'
-        required: false
-        default: 'main'
-  # Auto-release when you push a tag to this PUBLIC repo (e.g., v1.0.0)
-  push:
-    tags:
-      - 'v*'
+      tag:
+        description: 'Release tag (e.g., v0.1.0)'
+        required: true
+      prerelease:
+        description: 'Mark as pre-release'
+        type: boolean
+        default: false
 
 permissions:
-  contents: write   # needed to create a Release in this PUBLIC repo
+  contents: write
 
 jobs:
   build-release:
     runs-on: windows-latest
-
     steps:
-      - name: Checkout PRIVATE repo (source)
+      - name: Checkout public repo (target)
+        uses: actions/checkout@v4
+
+      - name: Checkout private source (SoDSaveEditor)
         uses: actions/checkout@v4
         with:
           repository: Xion28080/SoDSaveEditor
+          ref: main
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          ref: ${{ github.event.inputs.ref || 'main' }}
+          path: src
 
-      - name: Setup .NET 8
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: 8.0.x
 
-      # If your solution is at repo root, adjust as needed:
-      - name: Restore
-        run: dotnet restore
-
-      - name: Publish (win-x64, self-contained, single-file)
-        run: >
-          dotnet publish
-          -c Release
-          -r win-x64
-          --self-contained true
-          /p:PublishSingleFile=true
-          /p:IncludeNativeLibrariesForSelfExtract=true
-          /p:DebugType=None
-          /p:DebugSymbols=false
-
-      # Find the publish output (adjust project name if not SoDSaveEditor)
-      - name: Locate output
-        id: out
-        shell: pwsh
+      - name: Restore + Publish (win-x64, self-contained)
         run: |
-          $p = Get-ChildItem -Recurse -Directory -Filter "publish" |
-               Where-Object { $_.FullName -match "bin\\Release\\net8.0-windows\\win-x64\\publish$" } |
-               Select-Object -First 1 -ExpandProperty FullName
-          if (-not $p) { throw "Publish folder not found." }
-          echo "path=$p" >> $env:GITHUB_OUTPUT
+          dotnet restore src/SoDSaveEditor/SoDSaveEditor.csproj
+          dotnet publish src/SoDSaveEditor/SoDSaveEditor.csproj -c Release -r win-x64 -p:PublishSingleFile=true --self-contained true -o out
 
-      - name: Create ZIP
+      - name: Zip artifacts
         shell: pwsh
-        run: |
-          $zip = "SoDSaveEditor-win-x64.zip"
-          Compress-Archive -Path "${{ steps.out.outputs.path }}\*" -DestinationPath $zip -Force
-          echo "Created $zip"
-          Get-ChildItem $zip
+        run: Compress-Archive -Path out\* -DestinationPath SoDSaveEditor-${{ inputs.tag }}.zip
 
-      # Upload artifact for job logs (optional)
-      - name: Upload artifact (CI)
+      - name: Upload build (artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: SoDSaveEditor-win-x64
-          path: SoDSaveEditor-win-x64.zip
-          if-no-files-found: error
-          retention-days: 7
+          name: SoDSaveEditor-${{ inputs.tag }}
+          path: SoDSaveEditor-${{ inputs.tag }}.zip
 
-      # Create or update a GitHub Release in this PUBLIC repo
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: SoDSaveEditor-win-x64.zip
+          tag_name: ${{ inputs.tag }}                     # <— pass the tag
+          name: SoDSaveEditor ${{ inputs.tag }}
+          body: "Automated release from private source."
+          files: SoDSaveEditor-${{ inputs.tag }}.zip
           draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: ${{ inputs.prerelease }}
