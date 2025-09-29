@@ -86,8 +86,7 @@ Look for these two files inside that folder:
   - Exclusives are shown as **read-only** and cannot be unlocked.
 
 - **Hats**  
-  - Toggle accessory unlocks under `profile.accessories`.  
-  - Only default, non-exclusive hats are editable.  
+  - Toggle accessory unlocks under `profile.accessories`.   
   - Exclusives are shown as **read-only** and cannot be unlocked.
 
 - **Achievements**  
