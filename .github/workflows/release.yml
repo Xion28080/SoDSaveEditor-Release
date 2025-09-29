@@ -14,36 +14,54 @@ on:
 permissions:
   contents: write
 
+env:
+  # 🔧 CHANGE THESE TWO to match your setup
+  PRIVATE_REPO: Xion28080/SoDSaveEditor        # e.g. Xion28080/SoDSaveEditor-Private
+  PROJECT_PATH: src/SoDSaveEditor/SoDSaveEditor.csproj
+
 jobs:
   build-release:
     runs-on: windows-latest
+
     steps:
-      - name: Checkout public repo (target)
+      - name: Checkout (this public repo)
         uses: actions/checkout@v4
 
-      - name: Checkout private source (SoDSaveEditor)
+      - name: Checkout private source
         uses: actions/checkout@v4
         with:
-          repository: Xion28080/SoDSaveEditor
+          repository: ${{ env.PRIVATE_REPO }}
           ref: main
-          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}  # private key stored as a secret in THIS (public) repo
           path: src
 
-      - name: Setup .NET
+      - name: Show dotnet & tree
+        shell: pwsh
+        run: |
+          dotnet --info
+          Write-Host "`n=== Root ==="
+          Get-ChildItem -Force
+          Write-Host "`n=== src ==="
+          Get-ChildItem -Force src
+          Write-Host "`n=== src/SoDSaveEditor (if exists) ==="
+          if (Test-Path src\SoDSaveEditor) { Get-ChildItem -Force src\SoDSaveEditor }
+
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
 
-      - name: Restore + Publish (win-x64, self-contained)
-        run: |
-          dotnet restore src/SoDSaveEditor/SoDSaveEditor.csproj
-          dotnet publish src/SoDSaveEditor/SoDSaveEditor.csproj -c Release -r win-x64 -p:PublishSingleFile=true --self-contained true -o out
+      - name: Restore
+        run: dotnet restore "${{ env.PROJECT_PATH }}"
+
+      - name: Publish (win-x64, single-file, self-contained)
+        run: dotnet publish "${{ env.PROJECT_PATH }}" -c Release -r win-x64 -p:PublishSingleFile=true --self-contained true -o out
 
       - name: Zip artifacts
         shell: pwsh
         run: Compress-Archive -Path out\* -DestinationPath SoDSaveEditor-${{ inputs.tag }}.zip
 
-      - name: Upload build (artifact)
+      - name: Upload artifact (for debugging too)
         uses: actions/upload-artifact@v4
         with:
           name: SoDSaveEditor-${{ inputs.tag }}
@@ -52,7 +70,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}                     # <— pass the tag
+          tag_name: ${{ inputs.tag }}
           name: SoDSaveEditor ${{ inputs.tag }}
           body: "Automated release from private source."
           files: SoDSaveEditor-${{ inputs.tag }}.zip
