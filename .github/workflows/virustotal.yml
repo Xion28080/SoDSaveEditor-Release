@@ -106,18 +106,18 @@ jobs:
             echo "Uploading large file..."
             RESP=$(curl -s --request POST \
               --url "$UP" \
-              --header "x-apikey: $VT_API_KEY" \   # <<— critical fix
-              --form "file=@$FILE")
+              --header "x-apikey: $VT_API_KEY" \
+              -F "file=@$FILE")
           else
             echo "Uploading with standard endpoint..."
             RESP=$(curl -s --request POST \
               --url https://www.virustotal.com/api/v3/files \
               --header "x-apikey: $VT_API_KEY" \
-              --form "file=@$FILE")
+              -F "file=@$FILE")
           fi
           echo "$RESP" > upload.json
-          ANALYSIS=$(jq -r '.data.id' upload.json)
-          if [ -z "$ANALYSIS" ] || [ "$ANALYSIS" = "null" ]; then
+          ANALYSIS=$(jq -r '.data.id // empty' upload.json)
+          if [ -z "$ANALYSIS" ]; then
             echo "Upload failed"; cat upload.json; exit 1
           fi
           echo "ANALYSIS=$ANALYSIS" >> "$GITHUB_OUTPUT"
