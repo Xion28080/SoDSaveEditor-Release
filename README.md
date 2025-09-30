@@ -45,7 +45,9 @@ Every release includes:
 
 Typical location:
 
-```%USERPROFILE%\AppData\LocalLow\Lizard Smoothie\Shape of Dreams\QuickSave```
+```
+%USERPROFILE%\AppData\LocalLow\Lizard Smoothie\Shape of Dreams\QuickSave
+```
 
 
 Look for these two files inside that folder:
